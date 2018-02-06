@@ -3,53 +3,29 @@ var express = require('express'),
     analyse = require('body-parser'),
     noteur = require('morgan'),
     MongoClient = require('mongodb').MongoClient,
+    mongoose = require('mongoose'),
     assert = require('assert'),
     _ = require('lodash'),
     jwt = require('jsonwebtoken'),
     passport = require('passport'),
     passportJWT = require('passport-jwt'),
 
-    ExtractJwt = passportJWT.ExtractJwt,
-    JwtStrategy = passportJWT.Strategy,
+    Utilisateur = require('./models/utilisateur'),
+    config = require('./config/main'),
     
-    routeur = express.Router(),
-    users = [
-        {
-            id: 1,
-            nom: 'bab',
-            motDePasse: '%zak::'
-
-        },
-        {
-            id: 2,
-            nom: 'test',
-            motDePasse: 'test'
-        }
-    ],
-    jwtOptions = {};
-
-jwtOptions.jwtFromRequest = ExtractJwt.fromAuthHeader();
-jwtOptions.secretOrKey = 'gentilBébéDePapaLovesChips&myPapaLovesSpicyChickenWings';
-var strategy = new JwtStrategy(jwtOptions, function(jwt_payload, next) {
-        console.log('payload received', jwt_payload);
-        // usually this would be a database call:
-        var user = users[_.findIndex(users, {id: jwt_payload.id})];
-        if (user) {
-            next(null, user);
-        } else {
-            next(null, false);
-        }
-    });
-passport.use(strategy);
+    
+    routeur = express.Router();
+    
+//passport.use(strategy);
         
 app.use(passport.initialize());
-app.use(analyse.urlencoded({ extended: true }));
+app.use(analyse.urlencoded({ extended: false }));
 app.use(analyse.json());
 app.use(noteur('dev'));
 
 app.set('json spaces', 4);
 
-MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
+/*MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
     assert.equal(null, err);
     console.log('\nConnection à la base effectuée');
 
@@ -58,13 +34,11 @@ MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
         console.log('Serveur en activité');
         next(); // make sure we go to the next routes and don't stop here
     });
-    routeur.get('/', function(req, res) {
-        res.json({message: 'Bienvenu sur pharma⁶!'});
-    });
+    routeur.get('/', (req, res) => res.json({message: 'Bienvenu sur pharma⁶!'}));
 
-    routeur.post("/login", function(req, res) {
+    routeur.post("/login", (req, res) => {
         if(req.body.nom && req.body.motDePasse){
-          var   nom = req.body.nom,
+            var nom = req.body.nom,
                 motDePasse = req.body.motDePasse;
         }
         // usually this would be a database call:
@@ -74,10 +48,10 @@ MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
         }
       
         if(user.motDePasse === req.body.motDePasse) {
-          // from now on we'll identify the user by the id and the id is the only personalized value that goes into our token
+          // from now on we'll identify the user by the id and the id is the only personalized value that goes into our jeton
           var payload = {id: user.id};
-          var token = jwt.sign(payload, jwtOptions.secretOrKey);
-          res.json({message: "ok", token: token});
+          var jeton = jwt.sign(payload, jwtOptions.secretOrKey);
+          res.json({message: "ok", jeton: jeton});
         } else {
           res.status(401).json({message:"motDePasses did not match"});
         }
@@ -85,8 +59,8 @@ MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
 
     
     
-    routeur.post('/nouvellePharmacie', function(req, res, next) {
-            //var agence = new Agence();
+    routeur.post('/nouvellePharmacie', (req, res) => {
+            var agence = "XX";
             db.collection('agences').insertOne(
                 {
                 nom : req.body.nom,
@@ -107,15 +81,34 @@ MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
                 email : req.body.email,
                 pharmacien : req.body.pharmacien,
                 crééLe : new Date()
+                }//, (req, res) => {
+                    //console.log('. . . test worked!')
+                //}
+            );
+            db.collection('agences').find(
+                {nom : req.body.nom, localite : req.body.localite},{_id: 1}, (req, res) => {
+                    var profilID = res._id;
+                    console.log(profilID)
+                }
+            ).sort({"_id": -1});
+            db.collection('utilisateurs').insertOne(
+                {
+                    login : req.body.email,
+                    motDePasse : req.body.motDePasse
                 }
             );
             res.json({message: 'Pharmacie ' + req.body.nom + ' de ' + req.body.localite + 'est enregistrée.'})
 
-        });
+        }
+    );
         
-    routeur.get("/pharmaciesPresDeChezMoi", passport.authenticate('jwt', {session: false }), function(req, res) {
-        res.json({message: 'là seront listées les pharmacies proches de vous!'})
-    });
+    routeur.get("/pharmaciesPresDeChezMoi", 
+        passport.authenticate('jwt', 
+            {session: false }), 
+            (req, res) => {
+                res.json({message: 'Ici seront listées les pharmacies proches de chez vous!'})
+            }
+        );
 
     app.use('/api', routeur);
 
@@ -126,16 +119,73 @@ MongoClient.connect('mongodb://localhost:27017/pharma⁶', function(err, db) {
         res.status(500).render('error_template', { error: err });
     }
     
-    var server = app.listen(8000, function() {
-        var port = server.address().port;
-        console.log('et serveur actif sur le port %s.\n', port);
-        console.log('API lancée et dispo.\n');
-    });
+    var server = app.listen(8000, () => {
+            var port = server.address().port;
+            console.log('et serveur actif sur le port %s.\n', port);
+            console.log('API lancée et dispo.\n');
+        }
+    );
     
+});*/
+
+mongoose.connect(config.db, () => {
+    console.log('\nConnection à la base effectuée');
+    require('./config/passport')(passport);
+
+    routeur.get('/', (req, res) => res.send('B i e n v e n u&nbsp; s u r&nbsp; p h a r m a ⁶ !'));
+
+    routeur.post('/senregistrer', (req, res) => {
+        if(!req.body.email || !req.body.motDePasse) {
+            res.json({succes: false, message: 'Il vous faut fournir une adresse email et un mot de passe pour s\'enregistrer'})
+        } else {
+            var nouvelUtilisateur = new Utilisateur({
+                email: req.body.email,
+                motDePasse: req.body.motDePasse
+            });
+            nouvelUtilisateur.save(function(err){
+                if (err) {
+                    return res.json({succes: false, message: req.body.email + ' est déjà utilisée.'})
+                }
+                res.json({succes: true, message: 'Utilisateur, ' + req.body.email + ' inscrit.'})
+            })
+        }
+    });
+
+    
+    routeur.post('/authenticate', function(req, res) {
+        Utilisateur.findOne({
+            email: req.body.email
+        }, function(err, utilisateur) {
+            if (err) throw err;
+            if (!utilisateur) {
+                res.send({succes: false, message: 'Authentification echouée. Mot de passe ou login erroné.'})
+            } else {
+                utilisateur.compareLesMotsDePasses(req.body.motDePasse, function(err, isMatch) {
+                    if (isMatch && !err) {
+                        console.log(utilisateur);
+                        var jeton = jwt.sign({uneCle: utilisateur._id}, config.secret, {
+                            expiresIn: 10080
+                        });
+                        res.json({succes: true, jeton: 'JWT ' + jeton})
+                    } else {
+                        res.json({succes: false, message: 'Authentification echouée. Mot de passe ou login erroné.'})
+                    }
+                })
+            }
+        })
+    });
+
+    routeur.get('/dashboard', passport.authenticate('jwt', {session: false}), function(req, res){
+        res.send('De la balle!!! Ici seront affichées les données de ce compte')
+    });
+
+    app.use('/api', routeur);
+    app.listen(config.port, (req, res, err) => {
+        console.log('et serveur actif sur le port %s.\n', config.port);
+        console.log('REST API prêt et disponible.\n')
+    });
 });
 
 
-
-/**/
 
 
